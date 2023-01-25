@@ -1,106 +1,133 @@
-use winit::window::Fullscreen;
 
-#[macro_use]
-extern crate glium;
+mod field;
+mod state;
+mod plot;
+
+use crate::field::{Field, C_};
+use crate::plot::{plot1D};
+use std::f32::consts::PI;
+use itertools_num::linspace;
+use ndarray::{Array};
 
 fn main() {
-    #[allow(unused_imports)]
-    use glium::{glutin, Surface};
+    let (x0, xf) = (-1.0, 1.0);
+    let field = Field::init(xf);
+    let N = 100;
+    let axis = Array::from_vec(linspace(x0, xf, N).collect());
 
-    let event_loop = glutin::event_loop::EventLoop::new();
-    let wb = glutin::window::WindowBuilder::new()
-      // .with_fullscreen(Some(Fullscreen::Borderless(None)))
-    ;
-    let cb = glutin::ContextBuilder::new();
-    let display = glium::Display::new(wb, cb, &event_loop).unwrap();
+    let es = vec![PI.powi(2) / 8.0, 4.0 * PI.powi(2) / 8.0, 9.0 * PI.powi(2) / 8.0];
+    for e in es {
 
-    #[derive(Copy, Clone)]
-    struct Vertex {
-        position: [f32; 2],
+        let res = field.solve_step_1D(Box::new(|x: f32| 0.0), e as f32);
+        
+        plot1D(&axis, &res, format!("{}.png", e).as_str()).unwrap();
     }
 
-    implement_vertex!(Vertex, position);
+}
 
-    let vertex1 = Vertex { position: [-0.5, -0.5] };
-    let vertex2 = Vertex { position: [ 0.0,  0.5] };
-    let vertex3 = Vertex { position: [ 0.5, -0.25] };
-    let shape = vec![vertex1, vertex2, vertex3];
+#[cfg(test)]
+mod tests {
+    use crate::field::{Field, C_, normalize};
+    // use crate::state::State;
+    use itertools_num::linspace;
+    use ndarray::{Array, array, Array1};
+    // use ndarray_linalg:;
+    use num::complex::Complex;
+    use std::f32::consts::PI;
 
-    let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
-    let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
-    let vertex_shader_src = r#"
-        #version 140
+    #[test]
+    fn field_basics() {
+        let field = Field::init(1.0);
 
-        in vec2 position;
-        out vec3 in_color;
-        uniform mat4 matrix;
+        let res = field.solve_step_1D(Box::new(|x: f32| 0.0), 1.0);
+        // field.plot1D(&res);
+    }
 
-        void main() {
-          gl_Position = matrix * vec4(position, 0.0, 1.0);
-          in_color = gl_Position.xyz;
+    #[test]
+    fn field_step() {
+        let field = Field::init(2.0);
+        
+    }
+
+    #[test]
+    fn state_sim() {
+    }
+
+    #[test]
+    fn normalize_trivial() {
+        let h = 1.0;
+        // empty arrays should throw bad options
+
+        let a1: Array<Complex<f32>, _>= Array::zeros(10);
+        assert!(normalize(&a1, h).is_none());
+
+        let a2: Array<Complex<f32>, _>= Array::zeros((10, 10));
+        assert!(normalize(&a2, h).is_none());
+
+        let a3: Array<Complex<f32>, _>= Array::zeros((10, 10, 2));
+        assert!(normalize(&a3, h).is_none());
+
+    }
+
+    #[test]
+    fn normalize_single_value() {
+        let h = 1.0;
+        // Single value gets renormalized such that their integral is 1
+        
+        let mut a1: Array<Complex<f32>, _>= Array::zeros(10);
+        a1[5] = C_(0.5, 0.0);
+        assert_eq!(normalize(&a1, h).unwrap()[[5]], C_(1.0, 0.0));
+
+        let mut a2: Array<Complex<f32>, _>= Array::zeros((10, 10));
+        a2[[5,5]] = C_(0.5, 0.0);
+        assert_eq!(normalize(&a2, h).unwrap()[[5,5]], C_(1.0, 0.0));
+
+        let mut a3: Array<Complex<f32>, _>= Array::zeros((10, 10, 2));
+        a3[[5,5,1]] = C_(0.5, 0.0);
+        assert_eq!(normalize(&a3, h).unwrap()[[5,5,1]], C_(1.0, 0.0));
+
+    }
+
+    fn gaussian(x: Array1<f32>) -> Complex<f32>
+    {
+        let k = x.ndim() as f32;
+        C_((2.0 * PI).powf(-k / 2.0) * (-0.5 * x.dot(&x) ).exp(), 0.0)
+    }
+
+
+    #[test]
+    fn normalize_gaussian() {
+
+        let N = 1000;
+        let (x0, xf) = (-4.0, 4.0);
+        let h = (xf - x0)/ N as f32;
+        let axis = Array::from_vec(linspace(x0, xf, N).collect());
+
+        // Univariate gaussian should renormalize to itself
+        let g1 = axis.map(|z|  gaussian(array![*z]));
+
+        let g1_norm = normalize(&g1, h).unwrap();
+        let mse = (g1_norm - g1).map(|x| x.re.powi(2)).sum();
+
+        assert!(mse < 1e-4);
+
+        // Bivariate gaussian should renormalize to itself
+        let N = 1000;
+        let (x0, xf) = (-10.0, 10.0);
+        let h = (xf - x0)/ N as f32;
+        let mut g2 = Array::zeros((N, N));
+        for i in 0..N {
+            for j in 0..N {
+                g2[[i, j]] = gaussian(array![axis[i], axis[j]]);
+            }
         }
-    "#;
 
-    let fragment_shader_src = r#"
-        #version 140
+        let g2_norm = normalize(&g2, h).unwrap();
+        println!("{} {} {}", mse, g2, g2_norm);
+        let mse = (g2_norm - g2).map(|x| x.re.powi(2)).sum();
+        assert!(mse < 1e-4);
 
-        out vec4 color;
-        in vec3 in_color;
+    }
 
-        void main() {
-            color = vec4(in_color, 1.0);
-        }
-    "#;
-
-    let program = glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
-
-    let mut t: f32 = -0.5;
-    event_loop.run(move |event, _, control_flow| {
-
-        match event {
-            glutin::event::Event::WindowEvent { event, .. } => match event {
-                glutin::event::WindowEvent::CloseRequested => {
-                    *control_flow = glutin::event_loop::ControlFlow::Exit;
-                    return;
-                },
-                _ => return,
-            },
-            glutin::event::Event::NewEvents(cause) => match cause {
-                glutin::event::StartCause::ResumeTimeReached { .. } => (),
-                glutin::event::StartCause::Init => (),
-                _ => return,
-            },
-            _ => return,
-        }
-
-        let next_frame_time = std::time::Instant::now() +
-            std::time::Duration::from_nanos(16_666_667);
-         *control_flow = glutin::event_loop::ControlFlow::WaitUntil(next_frame_time);
-
-        // we update `t`
-        t += 0.002;
-        if t > 0.5 {
-            t = -0.5;
-        }
-
-        let in_color = [t.abs(), t.abs(), t.abs()];
-        // println!("{:?}", in_color);
-        let mut target = display.draw();
-        target.clear_color(0.0, 0.0, 1.0, 1.0);
-
-        let uniforms = uniform! {
-            matrix: [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [ t , 0.0, 0.0, 1.0f32],
-            ],
-            in_color: in_color
-        };
-
-        target.draw(&vertex_buffer, &indices, &program, &uniforms,
-                    &Default::default()).unwrap();
-        target.finish().unwrap();
-    });
 }

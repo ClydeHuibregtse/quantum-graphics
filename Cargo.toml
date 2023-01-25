@@ -6,3 +6,7 @@ edition = "2021"
 [dependencies]
 glium = "*"
 winit = "*"
+ndarray = "*"
+num = "*"
+plotters = "0.3.3"
+itertools-num = "*"

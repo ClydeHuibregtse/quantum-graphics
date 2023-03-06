@@ -10,7 +10,7 @@ use itertools_num::linspace;
 use ndarray::{Array};
 
 fn main() {
-    let (x0, xf) = (-5.0, 5.0);
+    let (x0, xf) = (-1.0, 1.0);
     let field = Field::init(xf);
     let N = 100;
     let axis = Array::from_vec(linspace(x0, xf, N).collect());
@@ -20,12 +20,12 @@ fn main() {
 
         let res = field.solve_step_1D(Box::new(|x: f32| 0.0), e as f32);
         
-        plot1D(&axis, &res, format!("{}.png", e).as_str()).unwrap();
+        plot1D(&axis, &res, format!("plots/{}.png", e).as_str()).unwrap();
     }
 
-    let res = field.solve_step_1D(Box::new(|x: f32| 0.0), 1 as f32);
+    let res = field.solve_step_2D(Box::new(|x: f32| 0.0), 4.0 * PI.powi(2) / 8.0);
 
-    plot2D(&axis, &Array::zeros((axis.len(), axis.len())), format!("2D.png").as_str()).unwrap();
+    plot2D(&axis, &res, format!("plots/2D.png").as_str()).unwrap();
 
 }
 
@@ -129,8 +129,8 @@ mod tests {
 
         let g2_norm = normalize(&g2, h).unwrap();
         let mse = (&g2_norm - &g2).map(|x| x.re.powi(2)).sum();
-        plot1D(&axis, &g2.slice_move(s![500, ..]), "g2.png");
-        plot1D(&axis, &g2_norm.slice_move(s![500, ..]), "g2_norm.png");
+        plot1D(&axis, &g2.slice_move(s![500, ..]), "plots/g2.png");
+        plot1D(&axis, &g2_norm.slice_move(s![500, ..]), "plots/g2_norm.png");
         assert!(mse < 1e-4);
 
     }

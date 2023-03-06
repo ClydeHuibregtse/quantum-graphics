@@ -107,4 +107,16 @@ impl Field {
         out / A
     }
 
+    pub fn solve_step_2D(&self, v: Box<dyn Fn(f32) -> f32>, e: f32) -> Array2<Complex<f32>> {
+        
+        let state_oneD = self.solve_step_1D(v, e);
+        let mut out = Array2::zeros((state_oneD.len(), state_oneD.len()));
+        for (xi, _) in state_oneD.iter().enumerate() {
+            for (yi, _) in state_oneD.iter().enumerate() {
+                out[[xi, yi]] = state_oneD[xi] * state_oneD[yi];
+            }
+        }
+        out
+
+    }
 }

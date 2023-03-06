@@ -61,7 +61,7 @@ pub fn plot2D(axis: &Array1<f32>, state: &Array2<Complex<f32>>, filename: &str) 
     root.fill(&WHITE)?;
 
     let mut chart = ChartBuilder::on(&root)
-        .build_cartesian_3d(axis[0]..axis[axis.len() - 1], 0.0..6.0f32, axis[0]..axis[axis.len() - 1])?;
+        .build_cartesian_3d(axis[0]..axis[axis.len() - 1], -1.0..1.0f32, axis[0]..axis[axis.len() - 1])?;
     
     chart.with_projection(|mut p| {
         p.pitch = 0.5;
@@ -89,7 +89,7 @@ pub fn plot2D(axis: &Array1<f32>, state: &Array2<Complex<f32>>, filename: &str) 
             },
         )
         .style_func(&|&v| {
-            (&HSLColor(240.0 / 360.0 - 240.0 / 360.0 * v as f64 / 5.0, 1.0, 0.7)).into()
+            (&HSLColor(240.0 / 360.0 - 240.0 / 360.0 * v as f64, 1.0, 0.7)).into()
         }),
     )?;
 
